@@ -58,7 +58,7 @@ src/org/olap4j/driver/xmla/XmlaOlap4jDriverVersion.java" />
     </condition>
 
     <condition property="jdk17.present">
-        <contains string="${java.version}" substring="1.7." />
+        <contains string="${java.version}" substring="1.8." />
     </condition>
 
     <path id="project.bootclasspath.jdk15">
@@ -78,10 +78,10 @@ src/org/olap4j/driver/xmla/XmlaOlap4jDriverVersion.java" />
     <target name="setup" depends="version-properties,compile,create-dot-classpath"
         description="Setups the project for eclipse." />
 
-    <target name="hudson" depends="clean-all,clean-tests,version-properties,jar,source.jar,tck-jar,xmla-jar,test,jar-jdk14"
+    <target name="hudson" depends="clean-all,version-properties,jar,source.jar,tck-jar,xmla-jar,jar-jdk14"
         description="Sugar goal to build olap4j from hudson." />
 
-    <target name="hudson-notest" depends="clean-all,clean-tests,version-properties,jar,source.jar,tck-jar,xmla-jar,jar-jdk14"
+    <target name="hudson-notest" depends="clean-all,version-properties,jar,source.jar,tck-jar,xmla-jar,jar-jdk14"
             description="Sugar goal to build olap4j from hudson." />
 
     <target name="clean" depends="subfloor.clean, clean-generated, clean-foodmart"/>
@@ -119,7 +119,7 @@ VERSION.txt" />
         </zip>
     </target>
 
-    <target name="doczip" depends="clean-all,clean-tests,compile,compile-tests,version-properties,javadoc,javadoc-pdf,javadoc-with-ydoc"
+    <target name="doczip" depends="clean-all,compile,version-properties,javadoc,javadoc-pdf,javadoc-with-ydoc"
         description="Creates an archive of all docs to deploy on www.olap4j.org.
                      See also doc/deployDoc.sh.">
         <mkdir dir="${dist.dir}" />
@@ -144,7 +144,7 @@ olap4j_api.pdf"
         depends="init, compile.pre, compileJdk15, compileJdk16, compileJdk17, compile.src_copy, compile.res_copy, compile.lic_copy, compile.post"
         description="Performs all the steps to prepare the bin directory with a complete compilation" />
 
-    <target name="jar" depends="checkJdkVersion, compile, compile-tests, set-build.id, generate.manifest"
+    <target name="jar" depends="checkJdkVersion, compile, set-build.id, generate.manifest"
         description="Jars up the bin directory after a compile">
         <zip destfile="${dist.dir}/${ivy.artifact.id}-${project.revision}.jar">
             <zipfileset dir="${basedir}" prefix=""
@@ -186,8 +186,6 @@ LICENSE,
 NOTICE,
 README.txt,
 VERSION.txt" />
-            <zipfileset dir="${testclasses.dir}" prefix="" includes="**/*"
-                excludes="jndi.properties" />
         </zip>
     </target>
 
@@ -259,7 +257,6 @@ VERSION.txt" />
             <zipfileset dir="${basedir}" prefix="${ivy.artifact.id}-${project.revision}"
                     includes="
 src/**,
-testsrc/**,
 foodmart/*.zip,
 foodmart/*.xml,
 simple-jndi/**,
@@ -276,8 +273,7 @@ ivy-xmla.xml,
 ivy-tck.xml,
 ivy-jdk14.xml,
 ivysettings.xml,
-subfloor.xml,
-test.properties" />
+subfloor.xml" />
         </zip>
     </target>
 
@@ -383,10 +379,12 @@ class XmlaOlap4jDriverVersion {
         <replace token="default.transitive" value="default" file="${bin.dir}/ivy-xmla.xml"/>
         <ivy:retrieve conf="default" pattern="${lib.dir}/[module](-[classifier]).[ext]" />
 
+		<!--
         <ivy:resolve file="ivy-tck.xml" conf="test" />
         <ivy:deliver conf="test,test.transitive" deliverpattern="${bin.dir}/ivy-tck.xml" />
     	<replace token="test.transitive" value="test" file="${bin.dir}/ivy-tck.xml"/>
         <ivy:retrieve conf="test" pattern="${testlib.dir}/[module](-[classifier]).[ext]" />
+		-->
 
         <ivy:resolve file="ivy.xml" conf="default" />
         <ivy:deliver conf="default" deliverpattern="${dist.dir}/ivy.xml" />

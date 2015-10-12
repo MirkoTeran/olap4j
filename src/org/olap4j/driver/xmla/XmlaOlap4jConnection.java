@@ -53,7 +53,7 @@ import static org.olap4j.driver.xmla.XmlaOlap4jUtil.*;
  * @author jhyde
  * @since May 23, 2007
  */
-abstract class XmlaOlap4jConnection implements OlapConnection {
+public abstract class XmlaOlap4jConnection implements OlapConnection {
     /**
      * Handler for errors.
      */
@@ -143,7 +143,9 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
      * Enabling it makes the connection print out all queries
      * to {@link System#out}
      */
-    private static final boolean DEBUG = false;
+    public static boolean DEBUG = false;
+    public static long SESSION_TTL = 0;
+    public static boolean FILL_CELLSET_MEMBERS = true;
 
     /**
      * Creates an Olap4j connection an XML/A provider.
@@ -224,6 +226,7 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
         this.serverInfos =
             new XmlaOlap4jServerInfos() {
                 private String sessionId = null;
+                private long sessionTouch = System.currentTimeMillis();
                 public String getUsername() {
                     return map.get(
                         XmlaOlap4jDriver.Property.USER.name());
@@ -234,12 +237,44 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
                 }
                 public URL getUrl() {
                     return serverUrlObject;
+                }                
+                public synchronized String getSessionId() {                                        
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX
+                    /*
+                    System.out.println("getSessionId() - " + sessionId);
+                    System.out.println("Thread - " +Thread.currentThread());
+                    System.out.println("XmlaOlap4jServerInfos - " + this);
+                    System.out.println("XmlaOlap4jConnection - " + XmlaOlap4jConnection.this);                    
+                    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+                        System.out.println("\t" + ste);
                 }
-                public String getSessionId() {
+                    */                    
+                    if (sessionId != null)
+                    {
+                        final long now = System.currentTimeMillis();
+                        if ((now - sessionTouch) >= SESSION_TTL) 
+                        {
+                            sessionId = null;
+                        }
+                    }
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX
                     return sessionId;
                 }
-                public void setSessionId(String sessionId) {
-                    this.sessionId = sessionId;
+                public synchronized void setSessionId(String sessionId) { 
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX
+                    /*                                              
+                    System.out.println("setSessionId() - new=" + sessionId + ", old="+this.sessionId);
+                    System.out.println("Thread - " +Thread.currentThread());
+                    System.out.println("XmlaOlap4jServerInfos - " + this);
+                    System.out.println("XmlaOlap4jConnection - " + XmlaOlap4jConnection.this);
+                    
+                    for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+                        System.out.println("\t" + ste);
+                    }
+                    */
+                    this.sessionId = sessionId;                    
+                    sessionTouch = System.currentTimeMillis();
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX
                 }
             };
 
@@ -264,6 +299,12 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
     private XmlaHelper getHelper() {
         return helper;
     }
+
+    @Override public String toString()
+    {
+        return getClass() + "(URL="+serverInfos.getUrl()+", Hash="+hashCode()+")";
+    }
+
 
     /**
      * Initializes a cache object and configures it if cache
@@ -313,7 +354,7 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
         return url.startsWith(CONNECT_STRING_PREFIX);
     }
 
-    protected BackendFlavor getFlavor(boolean fail) throws OlapException {
+    public BackendFlavor getFlavor(boolean fail) throws OlapException {
         final Database database = getOlapDatabase();
         final String dataSourceInfo = database.getDataSourceInfo();
         final String provider = database.getProviderName();
@@ -797,7 +838,17 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
         return locale;
     }
 
+    public static boolean myEquals(Object a, Object b) {
+        return (a == b) || (a != null && a.equals(b));
+    }
+
     public void setRoleName(String roleName) throws OlapException {
+        // XXXXXXXXXXX: Kill session on role change
+        if (!myEquals(this.roleName, roleName)) {
+            serverInfos.setSessionId(null);
+            clearCache();
+        }
+
         this.roleName = roleName;
     }
 
@@ -832,12 +883,13 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
      * {@link BackendFlavor#getFlavor(XmlaOlap4jConnection)}
      * to get the vendor for a given connection.
      */
-    enum BackendFlavor {
+    public enum BackendFlavor {
         MONDRIAN("Mondrian"),
         SSAS("Microsoft"),
         PALO("Palo"),
         SAP("SAP"),
         ESSBASE("Essbase"),
+        INFOR("Infor"),        
         UNKNOWN("");
 
         private final String token;
@@ -849,10 +901,12 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
         static BackendFlavor getFlavor(
             String dataSourceInfo, String provider, boolean fail)
         {
+            // XXXXXXXXXXXXX  added Infor type and fixed null inputs
             for (BackendFlavor flavor : BackendFlavor.values()) {
-                if (provider.contains(flavor.token)
-                    || dataSourceInfo.contains(flavor.token))
+                if ((provider!=null && provider.contains(flavor.token))
+                    || (dataSourceInfo != null && dataSourceInfo.contains(flavor.token)))
                 {
+                    //System.out.println("getFlavor-selcted: " + flavor);
                     return flavor;
                 }
             }
@@ -1005,6 +1059,9 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
         MetadataRequest metadataRequest,
         Object[] restrictions) throws OlapException
     {
+        // XXXXXXXXXXXXXXXXXXXXX - moved to top so only 1 session is created
+        final String conProperties = makeConnectionPropertyList();        
+
         final String content = "Data";
         final String encoding = proxy.getEncodingCharsetName();
         final StringBuilder buf =
@@ -1012,8 +1069,36 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
                 "<?xml version=\"1.0\" encoding=\"" + encoding + "\"?>\n"
                 + "<SOAP-ENV:Envelope\n"
                 + "    xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\"\n"
-                + "    SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n"
-                + "  <SOAP-ENV:Body>\n"
+                + "    SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n");
+
+    
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - session
+        buf.append("  <SOAP-ENV:Header>\n");
+        final String exSessionId = serverInfos.getSessionId();        
+        if ((SESSION_TTL <= 0) || (exSessionId == null)) {
+            // no session or session expired -> add security info 
+            buf.append(
+                  "    <wsse:Security xmlns:wsse=\"http://schemas.xmlsoap.org/ws/2003/06/secext\">\n"
+                + "      <wsse:UsernameToken>\n"
+                + "        <wsse:Username>" + serverInfos.getUsername() + "</wsse:Username>\n"
+                + "        <wsse:Password Type=\"wsse:PasswordText\">" + serverInfos.getPassword() + "</wsse:Password>\n"
+                + "      </wsse:UsernameToken>\n"
+                + "    </wsse:Security>\n" 
+            );
+        }
+        if ((SESSION_TTL > 0) && (exSessionId == null)) {
+            // use sessions but expired -> start new session
+            buf.append("    <xmla:BeginSession xmlns:xmla=\"urn:schemas-microsoft-com:xml-analysis\" mustUnderstand=\"1\"/>\n");
+        } if ((SESSION_TTL > 0) && (exSessionId != null)) {
+            // use sessions and valid one -> use existing session
+            buf.append("    <xmla:Session xmlns:xmla=\"urn:schemas-microsoft-com:xml-analysis\" mustUnderstand=\"1\" SessionId=\"" + exSessionId + "\"/>\n");
+        }
+        buf.append("  </SOAP-ENV:Header>\n");
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - session
+
+
+        buf.append(
+                  "  <SOAP-ENV:Body>\n"
                 + "    <Discover xmlns=\"urn:schemas-microsoft-com:xml-analysis\"\n"
                 + "        SOAP-ENV:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">\n"
                 + "    <RequestType>");
@@ -1031,11 +1116,16 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
             for (int i = 0; i < restrictions.length; i += 2) {
                 final String restriction = (String) restrictions[i];
                 final Object o = restrictions[i + 1];
+                //System.out.println("restriction -> " + restriction + " = " + o);
                 if (o instanceof String) {
-                    buf.append("<").append(restriction).append(">");
+                    
                     final String value = (String) o;
+                    //System.out.println("string restriction -> " + restriction + " = " + value);
+                    if (value.length() > 0){ 
+                        buf.append("<").append(restriction).append(">");                        
                     xmlEncode(buf, value);
                     buf.append("</").append(restriction).append(">");
+                    }
 
                     // To remind ourselves to generate a <Catalog> restriction
                     // if the request supports it.
@@ -1059,7 +1149,7 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
             + "    <Properties>\n"
             + "      <PropertyList>\n");
 
-        String conProperties = makeConnectionPropertyList();
+        //String conProperties = makeConnectionPropertyList();        
         if (conProperties != null && !("".equals(conProperties))) {
             buf.append(conProperties);
         }
@@ -1083,9 +1173,14 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
                 dataSourceInfo =
                     context.olap4jConnection.getDatabase();
             }
+
+            // XXXXXXXXXXXXXXXXXXXXXXXXXX - do not use for old sessions
+            if ((SESSION_TTL <= 0) || (exSessionId == null)) {
             buf.append("        <DataSourceInfo>");
             xmlEncode(buf, dataSourceInfo);
             buf.append("</DataSourceInfo>\n");
+        }
+            // XXXXXXXXXXXXXXXXXXXXXXXXXX
         }
 
         String requestCatalogName = null;
@@ -1140,9 +1235,14 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
             final Locale locale1 = context.olap4jConnection.getLocale();
             if (locale1 != null) {
                 final short lcid = LcidLocale.localeToLcid(locale1);
+
+                // XXXXXXXXXXXXXXXXXXXXXXXXXX
+                if ((SESSION_TTL <= 0) || (exSessionId == null)) {
                 buf.append("<LocaleIdentifier>")
                     .append(lcid)
                     .append("</LocaleIdentifier>");
+            }
+                // XXXXXXXXXXXXXXXXXXXXXXXXXX
             }
         }
 
@@ -1763,8 +1863,9 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
                 }
                 for (Property property : level.getProperties()) {
                     if (property instanceof XmlaOlap4jProperty
-                        && property.getName().equalsIgnoreCase(
-                            node.getLocalName()))
+                        && ( property.getName().equalsIgnoreCase(node.getLocalName()) ||
+                             property.getName().equalsIgnoreCase(node.getLocalName().replace("_x0020_", " ")) )
+                        )
                     {
                         map.put(property, node.getTextContent());
                     }
@@ -1887,7 +1988,7 @@ abstract class XmlaOlap4jConnection implements OlapConnection {
             //         Name Level - Store Manager Property</DESCRIPTION>
             // </row>
             String description = stringElement(row, "DESCRIPTION");
-            String uniqueName = stringElement(row, "DESCRIPTION");
+            String uniqueName = stringElement(row, "PROPERTY_NAME");
             String caption = stringElement(row, "PROPERTY_CAPTION");
             String name = stringElement(row, "PROPERTY_NAME");
             Datatype datatype;

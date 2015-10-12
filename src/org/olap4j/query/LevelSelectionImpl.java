@@ -96,7 +96,7 @@ class LevelSelectionImpl extends AbstractSelection {
 
     public ParseTreeNode visit() {
         // TODO this is a hack for MONDRIAN-929 and needs to be removed again
-        if (Type.ALL.equals(level.getLevelType())
+        if (level.getLevelType().equals(Type.ALL)
             && operator.equals(Operator.MEMBERS))
         {
             try {

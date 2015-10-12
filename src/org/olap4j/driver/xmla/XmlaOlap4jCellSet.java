@@ -94,7 +94,6 @@ abstract class XmlaOlap4jCellSet implements CellSet {
     private final List<CellSetAxis> immutableAxisList =
         Olap4jUtil.cast(Collections.unmodifiableList(axisList));
     private XmlaOlap4jCellSetAxis filterAxis;
-    private static final boolean DEBUG = false;
 
     private static final List<String> standardProperties = Arrays.asList(
         "UName", "Caption", "LName", "LNum", "DisplayInfo");
@@ -153,7 +152,9 @@ abstract class XmlaOlap4jCellSet implements CellSet {
         //   </SOAP-ENV:Body>
         // </SOAP-ENV:Envelope>
         final Element envelope = doc.getDocumentElement();
-        if (DEBUG) {
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("**********************************************");
+            System.out.println("XMLA EXECUTE RESPONSE");
             System.out.println(XmlaOlap4jUtil.toString(doc, true));
         }
         assert envelope.getLocalName().equals("Envelope");
@@ -257,9 +258,18 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             }
         }
 
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - INFOR
+        final org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor backendFlavor = olap4jStatement.olap4jConnection.getFlavor(false);
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("Decoding result based on backend: " + backendFlavor);
+        }
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - END
+
         // Fetch all members on all axes. Hopefully it can all be done in one
         // round trip, or they are in cache already.
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.FILL_CELLSET_MEMBERS) {
         metadataReader.lookupMembersByUniqueName(uniqueNames, memberMap);
+        }
 
         // Second pass, populate the axis.
         final Map<Property, Object> propertyValues =
@@ -285,8 +295,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                 for (Element memberNode
                     : findChildren(tupleNode, MDDATASET_NS, "Member"))
                 {
-                    String hierarchyName =
-                        memberNode.getAttribute("Hierarchy");
+                    String hierarchyName = memberNode.getAttribute("Hierarchy");
                     final String uname = stringElement(memberNode, "UName");
                     XmlaOlap4jMemberBase member = memberMap.get(uname);
                     if (member == null) {
@@ -296,31 +305,50 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                         final Hierarchy hierarchy =
                             lookupHierarchy(metaData.cube, hierarchyName);
                         final Level level = hierarchy.getLevels().get(lnum);
+
+                        final String parentUN = stringElement(memberNode, "PARENT_UNIQUE_NAME");
+
                         member = new XmlaOlap4jSurpriseMember(
-                            this, level, hierarchy, lnum, caption, uname);
+                            this, level, hierarchy, lnum, caption, uname, parentUN);
                     }
                     propertyValues.clear();
+
+
+                    /*
+                    // original
                     for (Element childNode : childElements(memberNode)) {
+                        //System.out.println(uname + " ==> local name = " + childNode.getLocalName() + " ==> " + childNode.getTextContent());
                         XmlaOlap4jCellSetMemberProperty property =
-                            ((XmlaOlap4jCellSetAxisMetaData)
-                                cellSetAxis.getAxisMetaData()).lookupProperty(
-                                    hierarchyName,
-                                    childNode.getLocalName());
+                            ((XmlaOlap4jCellSetAxisMetaData)cellSetAxis.getAxisMetaData()).lookupProperty(hierarchyName, childNode.getLocalName());
                         if (property != null) {
                             String value = childNode.getTextContent();
                             propertyValues.put(property, value);
                         }
                     }
+                    */
+
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - INFOR
+                    if (backendFlavor == org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor.INFOR) {
+                        // trim start/end brackets []
+                        hierarchyName = hierarchyName.substring(1, hierarchyName.length()-1);                    
+                    }
+                    for (Element childNode : childElements(memberNode)) {                        
+                        //System.out.println(uname + " ==> local name = " + childNode.getLocalName() + " ==> " + childNode.getTextContent());
+                        XmlaOlap4jCellSetMemberProperty property =
+                            ((XmlaOlap4jCellSetAxisMetaData)cellSetAxis.getAxisMetaData()).lookupProperty(hierarchyName, childNode.getLocalName());
+                        if (property != null) {
+                            String value = childNode.getTextContent();
+                            propertyValues.put(property, value);
+                        }
+                    }
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - END
+
                     if (!propertyValues.isEmpty()) {
-                        member =
-                            new XmlaOlap4jPositionMember(
-                                member, propertyValues);
+                        member = new XmlaOlap4jPositionMember(member, propertyValues);
                     }
                     members.add(member);
                 }
-                positions.add(
-                    new XmlaOlap4jPosition(
-                        members, positions.size()));
+                positions.add(new XmlaOlap4jPosition(members, positions.size()));
             }
         }
 
@@ -595,7 +623,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
      * @return Hierarchy
      * @throws OlapException on error
      */
-    private Hierarchy lookupHierarchy(XmlaOlap4jCube cube, String hierarchyName)
+    private synchronized Hierarchy lookupHierarchy(XmlaOlap4jCube cube, String hierarchyName)
         throws OlapException
     {
         Hierarchy hierarchy = cube.getHierarchies().get(hierarchyName);
@@ -1396,7 +1424,8 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             Hierarchy hierarchy,
             int lnum,
             String caption,
-            String uname)
+            String uname,
+            String parentMemberUniqueName)
         {
             this.cellSet = cellSet;
             this.level = level;
@@ -1404,7 +1433,12 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             this.lnum = lnum;
             this.caption = caption;
             this.uname = uname;
-            parentMemberUniqueName = getParentUniqueName();
+            if (parentMemberUniqueName == null) {
+                this.parentMemberUniqueName = getParentUniqueName();
+            } else {
+                this.parentMemberUniqueName = parentMemberUniqueName;
+            }
+            //System.out.println("new XmlaOlap4jSurpriseMember - "+ uname);
         }
 
         private String getParentUniqueName() {
@@ -1548,7 +1582,10 @@ abstract class XmlaOlap4jCellSet implements CellSet {
         }
 
         public NamedList<Property> getProperties() {
+            if (level == null) {
             return Olap4jUtil.emptyNamedList();
+        }
+            return level.getProperties();
         }
 
         public int getOrdinal() {

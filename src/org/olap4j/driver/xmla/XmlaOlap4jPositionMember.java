@@ -40,7 +40,7 @@ import java.util.*;
  * @author jhyde
  * @since Dec 7, 2007
  */
-class XmlaOlap4jPositionMember
+public class XmlaOlap4jPositionMember
     implements XmlaOlap4jMemberBase
 {
     private final XmlaOlap4jMemberBase member;
@@ -89,6 +89,10 @@ class XmlaOlap4jPositionMember
 
     public XmlaOlap4jCatalog getCatalog() {
         return member.getCatalog();
+    }
+
+    public Map<Property, Object> getLocalPropertyValueMap() {
+        return propertyValues;
     }
 
     public Map<Property, Object> getPropertyValueMap() {
@@ -157,6 +161,16 @@ class XmlaOlap4jPositionMember
         if (propertyValues.containsKey(property)) {
             return propertyValues.get(property);
         }
+
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - INFOR
+        for (Property pvk:propertyValues.keySet()) {
+            if (pvk.getName().equals(property.getName())) {
+                return propertyValues.get(pvk);
+            }
+        }
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - END
+
+
         return member.getPropertyValue(property);
     }
 

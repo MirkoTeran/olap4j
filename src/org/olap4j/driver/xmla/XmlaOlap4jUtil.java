@@ -294,9 +294,8 @@ abstract class XmlaOlap4jUtil {
         final String s = stringElement(row, name);
         if (s == null || s.equals("")) {
             return null;
-        } else {
-            return Integer.valueOf(s);
         }
+        return Integer.valueOf(s);
     }
 
     static byte byteElement(Element row, String name) {
@@ -313,7 +312,20 @@ abstract class XmlaOlap4jUtil {
     }
 
     static Double doubleElement(Element row, String name) {
-        return Double.valueOf(stringElement(row, name));
+        final String s = stringElement(row, name);
+        if (s == null || s.equals("")) {
+            return null;
+        }
+        if (s.equals("INF")) {
+            return Double.POSITIVE_INFINITY;
+        }
+        if (s.equals("-INF")) {
+            return Double.NEGATIVE_INFINITY;
+        }
+        if (s.equals("NaN")) {
+            return Double.NaN;
+        }
+        return Double.valueOf(s);
     }
 
     static BigDecimal bigDecimalElement(Element row, String name) {

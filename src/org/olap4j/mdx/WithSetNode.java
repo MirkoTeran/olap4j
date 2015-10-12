@@ -63,7 +63,12 @@ public class WithSetNode implements ParseTreeNode {
         name.unparse(writer);
         writer.indent();
         pw.println(" AS");
+
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - ADDED SINGLE QUOTES
+        pw.print("'");
         expression.unparse(writer);
+        pw.print("'");
+
         writer.outdent();
     }
 

@@ -64,13 +64,21 @@ class XmlaOlap4jCellSetAxisMetaData implements CellSetAxisMetaData {
         String hierarchyName,
         String tag)
     {
+        //System.out.println("    looking for " + hierarchyName + " & " + tag);
         for (XmlaOlap4jCellSetMemberProperty property : propertyList) {
-            if (property.hierarchy.getName().equals(hierarchyName)
+            //System.out.println("        checking " + property.hierarchy.getUniqueName() + " | " + property.hierarchy.getName() + " & " + property.tag);
+            //System.out.println("            T1 = " + property.hierarchy.getUniqueName().equals(hierarchyName));
+            //System.out.println("            T2 = " + property.hierarchy.getName().equals(hierarchyName));
+            //System.out.println("            T3 = " + property.tag.equals(tag));
+            //if (property.hierarchy.getName().equals(hierarchyName) && property.tag.equals(tag))   // <- original
+            if ((property.hierarchy.getUniqueName().equals(hierarchyName) || property.hierarchy.getName().equals(hierarchyName)) // <- fixed for infor
                 && property.tag.equals(tag))
             {
+                //System.out.println("    found");
                 return property;
             }
         }
+        //System.out.println("    nope");
         return null;
     }
 }

@@ -73,7 +73,12 @@ public class WithMemberNode implements ParseTreeNode {
         pw.println(" AS");
         // The MDX language, and olap4j's parser, allows formulas in calculated
         // members and sets to be specified with and without single quotes.
+
+        // // XXXXXXXXXXXXXXXXXXXXXXXXXX - ADDED SINGLE QUOTES
+        pw.print("'");
         expression.unparse(writer);
+        pw.print("'");
+
         if (memberPropertyList != null) {
             for (PropertyValueNode memberProperty : memberPropertyList) {
                 pw.print(", ");

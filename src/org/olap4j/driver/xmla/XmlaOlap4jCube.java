@@ -153,7 +153,7 @@ class XmlaOlap4jCube implements Cube, Named
         return Olap4jUtil.cast(dimensions);
     }
 
-    public NamedList<Hierarchy> getHierarchies() {
+    public synchronized NamedList<Hierarchy> getHierarchies() {
         // This is a costly operation. It forces the init
         // of all dimensions and all hierarchies.
         // We defer it to this point.

@@ -140,11 +140,11 @@ public class XmlaOlap4jHttpProxy extends XmlaOlap4jAbstractHttpProxy
             String contentEncoding =
                 urlConnection.getHeaderField("Content-Encoding");
             if ("gzip".equals(contentEncoding)) {
-                is = new GZIPInputStream(is);
+                is = new GZIPInputStream(is, 64*1024);                
             }
 
-            final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            byte[] buf = new byte[1024];
+            final ByteArrayOutputStream baos = new ByteArrayOutputStream(64*1024);
+            byte[] buf = new byte[32*1024];
             int count;
 
             while ((count = is.read(buf)) > 0) {
