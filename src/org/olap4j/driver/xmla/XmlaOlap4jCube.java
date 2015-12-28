@@ -168,7 +168,8 @@ class XmlaOlap4jCube implements Cube, Named
 
     public boolean isDrillThroughEnabled() {
         // XMLA does not implement drillthrough yet.
-        return false;
+        // XMLA imeplemeted in external module
+        return true;
     }
 
     public List<Measure> getMeasures() {

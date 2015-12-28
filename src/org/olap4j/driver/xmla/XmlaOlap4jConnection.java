@@ -1231,20 +1231,20 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
             buf.append("</Catalog>\n");
         }
 
-        if (metadataRequest.allowsLocale()) {
+        //if (metadataRequest.allowsLocale()) {
             final Locale locale1 = context.olap4jConnection.getLocale();
             if (locale1 != null) {
                 final short lcid = LcidLocale.localeToLcid(locale1);
 
                 // XXXXXXXXXXXXXXXXXXXXXXXXXX
                 if ((SESSION_TTL <= 0) || (exSessionId == null)) {
-                buf.append("<LocaleIdentifier>")
-                    .append(lcid)
-                    .append("</LocaleIdentifier>");
-            }
+                    buf.append("        <LocaleIdentifier>")
+                        .append(lcid)
+                        .append("</LocaleIdentifier>\n");
+                }
                 // XXXXXXXXXXXXXXXXXXXXXXXXXX
             }
-        }
+        //}
 
         buf.append("        <Content>");
         xmlEncode(buf, content);

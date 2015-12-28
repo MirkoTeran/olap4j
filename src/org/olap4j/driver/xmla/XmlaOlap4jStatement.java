@@ -32,7 +32,7 @@ import java.util.concurrent.*;
  * @author jhyde
  * @since May 24, 2007
  */
-abstract class XmlaOlap4jStatement implements OlapStatement {
+public abstract class XmlaOlap4jStatement implements OlapStatement {
     final XmlaOlap4jConnection olap4jConnection;
     private boolean closed;
 
@@ -492,6 +492,138 @@ abstract class XmlaOlap4jStatement implements OlapStatement {
         ParseTreeWriter parseTreeWriter = new ParseTreeWriter(sw);
         node.unparse(parseTreeWriter);
         return sw.toString();
+    }
+
+
+    public byte[] executeRawQuery(String mdx) throws Exception {
+
+        final XmlaOlap4jServerInfos serverInfos = olap4jConnection.serverInfos;
+
+        final String catalog = olap4jConnection.getCatalog();
+        final String roleName = olap4jConnection.getRoleName();
+        final String propList = olap4jConnection.makeConnectionPropertyList();
+
+        final String dataSourceInfo;
+        switch (olap4jConnection.getFlavor(true)) {
+        case ESSBASE:
+            dataSourceInfo =
+                olap4jConnection.getOlapDatabase().getDataSourceInfo();
+            break;
+        default:
+            dataSourceInfo =
+                olap4jConnection.getDatabase();
+        }
+
+        StringBuilder buf = new StringBuilder(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            + "<soapenv:Envelope\n"
+            + "    xmlns:soapenv=\"http://schemas.xmlsoap.org/soap/envelope/\"\n"
+            + "    xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"\n"
+            + "    xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n"
+            );
+
+
+
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - session
+        buf.append("  <soapenv:Header>\n");
+        final String exSessionId = serverInfos.getSessionId();
+        final long sessionTtl = org.olap4j.driver.xmla.XmlaOlap4jConnection.SESSION_TTL;
+        if ((sessionTtl <= 0) || (exSessionId == null)) {
+            // no session or session expired -> add security info 
+            buf.append(
+                  "    <wsse:Security xmlns:wsse=\"http://schemas.xmlsoap.org/ws/2003/06/secext\">\n"
+                + "      <wsse:UsernameToken>\n"
+                + "        <wsse:Username>" + serverInfos.getUsername() + "</wsse:Username>\n"
+                + "        <wsse:Password Type=\"wsse:PasswordText\">" + serverInfos.getPassword() + "</wsse:Password>\n"
+                + "      </wsse:UsernameToken>\n"
+                + "    </wsse:Security>\n" 
+            );
+        }
+        if ((sessionTtl > 0) && (exSessionId == null)) {
+            // use sessions but expired -> start new session
+            buf.append("    <xmla:BeginSession xmlns:xmla=\"urn:schemas-microsoft-com:xml-analysis\" mustUnderstand=\"1\"/>\n");
+        } if ((sessionTtl > 0) && (exSessionId != null)) {
+            // use sessions and valid one -> use existing session
+            buf.append("    <xmla:Session xmlns:xmla=\"urn:schemas-microsoft-com:xml-analysis\" mustUnderstand=\"1\" SessionId=\"" + exSessionId + "\"/>\n");
+        }
+        buf.append("  </soapenv:Header>\n");
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - session
+
+
+
+        buf.append(
+              "    <soapenv:Body>\n"
+            + "        <Execute xmlns=\"urn:schemas-microsoft-com:xml-analysis\">\n"
+            + "        <Command>\n"
+            + "        <Statement>\n"
+            + "           <![CDATA[\n" + mdx + "]]>\n"
+            + "         </Statement>\n"
+            + "        </Command>\n"
+            + "        <Properties>\n"
+            + "          <PropertyList>\n"
+            );
+
+
+
+        if (catalog != null) {
+            buf.append("            <Catalog>");
+            buf.append(catalog);
+            buf.append("</Catalog>\n");
+        }
+        if (propList != null) {
+            buf.append(propList);
+        }
+        if (roleName != null && !("".equals(roleName))) {
+            buf.append("        <Roles>");
+            buf.append(roleName);
+            buf.append("</Roles>\n");
+        }
+
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX
+        if ((sessionTtl <= 0) || (exSessionId == null)) {
+        if (dataSourceInfo != null) {
+            buf.append("            <DataSourceInfo>");
+            buf.append(dataSourceInfo);
+            buf.append("</DataSourceInfo>\n");
+        }
+        }
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX
+
+        buf.append(
+            "            <Format>Multidimensional</Format>\n"
+            + "            <AxisFormat>TupleFormat</AxisFormat>\n"
+            + "          </PropertyList>\n"
+            + "        </Properties>\n"
+            + "</Execute>\n"
+            + "</soapenv:Body>\n"
+            + "</soapenv:Envelope>");
+        final String request = buf.toString();
+
+
+        // Close the previous open CellSet, if there is one.
+        synchronized (this) {
+            if (openCellSet != null) {
+                final XmlaOlap4jCellSet cs = openCellSet;
+                openCellSet = null;
+                try {
+                    cs.close();
+                } catch (SQLException e) {
+                    throw getHelper().createException(
+                        "Error while closing previous CellSet", e);
+                }
+            }
+
+            this.future =
+                olap4jConnection.proxy.submit(
+                    olap4jConnection.serverInfos, request);
+        }
+        if (cancelEarly) {
+            cancel();
+        }
+        // Release the monitor before calling populate, so that cancel can
+        // grab the monitor if it needs to.
+
+        return this.future.get();
     }
 }
 
