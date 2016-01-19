@@ -29,13 +29,16 @@ import java.util.*;
  * @author jhyde
  * @since Dec 4, 2007
  */
-class XmlaOlap4jMeasure
+public class XmlaOlap4jMeasure
     extends XmlaOlap4jMember
     implements Measure, Named
 {
     private final Aggregator aggregator;
     private final Datatype datatype;
     private final boolean visible;
+
+    // NOTE: MEASUREGROUP_NAME
+    private String measureGroupName;
 
     /**
      * Creates an XmlaOlap4jMeasure.
@@ -94,6 +97,16 @@ class XmlaOlap4jMeasure
 
     public boolean isVisible() {
         return visible;
+    }
+
+    // NOTE: MEASUREGROUP_NAME
+    public String getMeasureGroupName() {
+        return measureGroupName;
+    }
+
+    // NOTE: MEASUREGROUP_NAME
+    public void setMeasureGroupName(final String measureGroupName) {
+        this.measureGroupName = measureGroupName;
     }
 }
 

@@ -31,7 +31,7 @@ import java.util.List;
  * @author jhyde
  * @since Dec 4, 2007
  */
-class XmlaOlap4jLevel
+public class XmlaOlap4jLevel
     extends XmlaOlap4jElement
     implements Level, Named
 {
@@ -42,6 +42,9 @@ class XmlaOlap4jLevel
     private final NamedList<XmlaOlap4jProperty> propertyList;
     final NamedList<XmlaOlap4jMember> memberList;
     private final boolean calculated;
+
+    // NOTE: LEVEL_ATTRIBUTE_HIERARCHY_NAME
+    private String attributeName;
 
     /**
      * Creates an XmlaOlap4jLevel.
@@ -158,6 +161,16 @@ class XmlaOlap4jLevel
 
     public int getDepth() {
         return depth;
+    }
+
+    // NOTE: LEVEL_ATTRIBUTE_HIERARCHY_NAME
+    public String getAttributeName() {
+        return attributeName;
+    }
+
+    // NOTE: LEVEL_ATTRIBUTE_HIERARCHY_NAME
+    public void setAttributeName(final String attributeName) {
+        this.attributeName=attributeName;
     }
 
     public Hierarchy getHierarchy() {

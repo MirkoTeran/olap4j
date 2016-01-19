@@ -1621,6 +1621,10 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
                 context.getHierarchy(row), levelUniqueName, levelName,
                 levelCaption, description, levelNumber, levelType,
                 calculated, levelCardinality);
+            
+            // NOTE: LEVEL_ATTRIBUTE_HIERARCHY_NAME
+            level.setAttributeName(stringElement(row, "LEVEL_ATTRIBUTE_HIERARCHY_NAME"));
+
             list.add(level);
             cubeForCallback.levelsByUname.put(
                 level.getUniqueName(),
@@ -1688,12 +1692,16 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
                     + measureUniqueName);
             }
 
-            list.add(
-                new XmlaOlap4jMeasure(
+            final XmlaOlap4jMeasure xmlaMeasure = new XmlaOlap4jMeasure(
                     (XmlaOlap4jLevel)member.getLevel(), measureUniqueName,
                     measureName, measureCaption, description, formatString,
                     null, measureAggregator, datatype, measureIsVisible,
-                    member.getOrdinal()));
+                    member.getOrdinal());
+            
+            // NOTE: MEASUREGROUP_NAME
+            xmlaMeasure.setMeasureGroupName(stringElement(row, "MEASUREGROUP_NAME"));
+
+            list.add(xmlaMeasure);
         }
 
         public void sortList(List<XmlaOlap4jMeasure> list) {
