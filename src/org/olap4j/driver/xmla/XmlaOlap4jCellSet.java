@@ -258,17 +258,17 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             }
         }
 
-        // XXXXXXXXXXXXXXXXXXXXXXXXXX - INFOR
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - DEBUG        
         final org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor backendFlavor = olap4jStatement.olap4jConnection.getFlavor(false);
         if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
-            System.out.println("Decoding result based on backend: " + backendFlavor);
+            System.out.println("[populate] Decoding result based on backend: " + backendFlavor);
         }
-        // XXXXXXXXXXXXXXXXXXXXXXXXXX - END
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - /DEBUG
 
         // Fetch all members on all axes. Hopefully it can all be done in one
         // round trip, or they are in cache already.
         if (org.olap4j.driver.xmla.XmlaOlap4jConnection.FILL_CELLSET_MEMBERS) {
-        metadataReader.lookupMembersByUniqueName(uniqueNames, memberMap);
+            metadataReader.lookupMembersByUniqueName(uniqueNames, memberMap);
         }
 
         // Second pass, populate the axis.
@@ -296,17 +296,34 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                     : findChildren(tupleNode, MDDATASET_NS, "Member"))
                 {
                     String hierarchyName = memberNode.getAttribute("Hierarchy");
+
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - HANA
+                    if (backendFlavor == org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor.HANA) {
+                        if (!hierarchyName.startsWith("[")) hierarchyName = "[" + hierarchyName;
+                        if (!hierarchyName.endsWith("]")) hierarchyName = hierarchyName + "]";                        
+                        //System.out.println("HANA hierarchy => "+ hierarchyName);
+                    }
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - /HANA
+
                     final String uname = stringElement(memberNode, "UName");
+                    //System.out.println("HANA UNIQUE_NAME => "+ uname);
+
+
                     XmlaOlap4jMemberBase member = memberMap.get(uname);
                     if (member == null) {
-                        final String caption =
-                            stringElement(memberNode, "Caption");
+                        final String caption = stringElement(memberNode, "Caption");
                         final int lnum = integerElement(memberNode, "LNum");
-                        final Hierarchy hierarchy =
-                            lookupHierarchy(metaData.cube, hierarchyName);
+                        final Hierarchy hierarchy = lookupHierarchy(metaData.cube, hierarchyName);
                         final Level level = hierarchy.getLevels().get(lnum);
 
-                        final String parentUN = stringElement(memberNode, "PARENT_UNIQUE_NAME");
+                        String parentUN = stringElement(memberNode, "PARENT_UNIQUE_NAME");
+                        
+                        // XXXXXXXXXXXXXXXXXXXXXXXXXX - HANA
+                        if (backendFlavor == org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor.HANA) {
+                            parentUN = XmlaOlap4jUtil.stringElementByName(memberNode, "[PARENT_UNIQUE_NAME]");
+                            //System.out.println("HANA PARENT_UNIQUE_NAME => "+ parentUN);
+                        }
+                        // XXXXXXXXXXXXXXXXXXXXXXXXXX - /HANA
 
                         member = new XmlaOlap4jSurpriseMember(
                             this, level, hierarchy, lnum, caption, uname, parentUN);
@@ -341,7 +358,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                             propertyValues.put(property, value);
                         }
                     }
-                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - END
+                    // XXXXXXXXXXXXXXXXXXXXXXXXXX - /INFOR
 
                     if (!propertyValues.isEmpty()) {
                         member = new XmlaOlap4jPositionMember(member, propertyValues);
@@ -475,15 +492,18 @@ abstract class XmlaOlap4jCellSet implements CellSet {
     private XmlaOlap4jCellSetMetaData createMetaData(Element root)
         throws OlapException
     {
-        final Element olapInfo =
-            findChild(root, MDDATASET_NS, "OlapInfo");
-        final Element cubeInfo =
-            findChild(olapInfo, MDDATASET_NS, "CubeInfo");
-        final Element cubeNode =
-            findChild(cubeInfo, MDDATASET_NS, "Cube");
-        final Element cubeNameNode =
-            findChild(cubeNode, MDDATASET_NS, "CubeName");
+        final Element olapInfo = findChild(root, MDDATASET_NS, "OlapInfo");
+        final Element cubeInfo = findChild(olapInfo, MDDATASET_NS, "CubeInfo");
+        final Element cubeNode = findChild(cubeInfo, MDDATASET_NS, "Cube");
+        final Element cubeNameNode = findChild(cubeNode, MDDATASET_NS, "CubeName");
         final String cubeName = gatherText(cubeNameNode);
+
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - DEBUG        
+        final org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor backendFlavor = olap4jStatement.olap4jConnection.getFlavor(false);
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[createMetaData] Decoding result based on backend: " + backendFlavor);
+        }
+        // XXXXXXXXXXXXXXXXXXXXXXXXXX - /DEBUG
 
         XmlaOlap4jCube cube =
             lookupCube(
@@ -528,8 +548,17 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             // </OlapInfo>
             final List<XmlaOlap4jCellSetMemberProperty> propertyList =
                 new ArrayList<XmlaOlap4jCellSetMemberProperty>();
-            for (Element hierarchyInfo : hierarchyInfos) {
-                final String hierarchyName = hierarchyInfo.getAttribute("name");
+            for (Element hierarchyInfo : hierarchyInfos) {                
+                String hierarchyName = hierarchyInfo.getAttribute("name");
+                
+                // XXXXXXXXXXXXXXXXXXXXXXXXXX - HANA                
+                if (backendFlavor == org.olap4j.driver.xmla.XmlaOlap4jConnection.BackendFlavor.HANA) {
+                    if (!hierarchyName.startsWith("[")) hierarchyName = "[" + hierarchyName;
+                    if (!hierarchyName.endsWith("]")) hierarchyName = hierarchyName + "]";
+                    //System.out.println("HANA hierarchy => "+ hierarchyName);
+                }
+                // XXXXXXXXXXXXXXXXXXXXXXXXXX - /HANA
+
                 Hierarchy hierarchy = lookupHierarchy(cube, hierarchyName);
                 hierarchyList.add(hierarchy);
                 for (Element childNode : childElements(hierarchyInfo)) {

@@ -290,6 +290,23 @@ abstract class XmlaOlap4jUtil {
         return null;
     }
 
+    static String stringElementByName(Element row, String nameValue) {
+        final NodeList childNodes = row.getChildNodes();
+        for (int i = 0; i < childNodes.getLength(); i++) {
+            final Node node = childNodes.item(i);
+            //System.out.println("HANA SEARCHING IN => "+ node.getLocalName());
+            if (node.hasAttributes()) {
+                final Node attrib = node.getAttributes().getNamedItem("name");
+                if ((attrib != null) && attrib.getNodeValue().contains(nameValue)) {
+                    //System.out.println("HANA SEARCHING IN => "+ node.getLocalName() + " | attrib.getNodeValue = " + attrib.getNodeValue());
+                    //System.out.println("HANA SEARCHING IN => "+ node.getLocalName() + " | node.getTextContent = " + node.getTextContent());
+                    return node.getTextContent();
+                }
+            }
+        }
+        return null;
+    }
+
     static Integer integerElement(Element row, String name) {
         final String s = stringElement(row, name);
         if (s == null || s.equals("")) {
@@ -334,6 +351,14 @@ abstract class XmlaOlap4jUtil {
 
     static boolean booleanElement(Element row, String name) {
         return "true".equals(stringElement(row, name));
+    }
+
+    static boolean booleanElement(Element row, String name, final boolean defValue) {
+        final String strValue = stringElement(row, name);
+        if (strValue == null) {
+            return defValue;
+        }
+        return "true".equals(strValue);
     }
 
     static Float floatElement(Element row, String name) {

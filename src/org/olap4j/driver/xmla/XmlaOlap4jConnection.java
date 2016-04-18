@@ -888,6 +888,7 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
         SSAS("Microsoft"),
         PALO("Palo"),
         SAP("SAP"),
+        HANA("HANA"),
         ESSBASE("Essbase"),
         INFOR("Infor"),        
         UNKNOWN("");
@@ -1679,7 +1680,7 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
                 datatype = ordinalDatatype;
             }
             final boolean measureIsVisible =
-                booleanElement(row, "MEASURE_IS_VISIBLE");
+                booleanElement(row, "MEASURE_IS_VISIBLE", true);
 
             final Member member =
                 context.getCube(row).getMetadataReader()
