@@ -143,7 +143,7 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
      * Enabling it makes the connection print out all queries
      * to {@link System#out}
      */
-    public static boolean DEBUG = false; 
+    public static boolean DEBUG = false;
     public static long SESSION_TTL = 0;
     public static boolean FILL_CELLSET_MEMBERS = true;
     public static long QUERY_COUNT = 0;
