@@ -196,8 +196,8 @@ VERSION.txt" />
           deprecation="${javac.deprecation}"
           fork="true"
           bootclasspathref="project.bootclasspath.jdk15"
-          source="1.5"
-          target="1.5"
+          source="1.8"
+          target="1.8"
           includeantruntime="false">
         <classpath>
           <path refid="classpath" />
@@ -216,8 +216,8 @@ VERSION.txt" />
           deprecation="${javac.deprecation}"
           fork="true"
           bootclasspathref="project.bootclasspath.jdk16"
-          source="1.6"
-          target="1.6"
+          source="1.8"
+          target="1.8"
           includeantruntime="false">
         <classpath>
           <path refid="classpath" />
@@ -234,8 +234,8 @@ VERSION.txt" />
           debug="${javac.debug}"
           deprecation="${javac.deprecation}"
           fork="true"
-          source="1.7"
-          target="1.7"
+          source="1.8"
+          target="1.8"
           includeantruntime="false">
         <classpath>
           <path refid="classpath" />
@@ -379,12 +379,12 @@ class XmlaOlap4jDriverVersion {
         <replace token="default.transitive" value="default" file="${bin.dir}/ivy-xmla.xml"/>
         <ivy:retrieve conf="default" pattern="${lib.dir}/[module](-[classifier]).[ext]" />
 
-		<!--
+        <!--
         <ivy:resolve file="ivy-tck.xml" conf="test" />
         <ivy:deliver conf="test,test.transitive" deliverpattern="${bin.dir}/ivy-tck.xml" />
-    	<replace token="test.transitive" value="test" file="${bin.dir}/ivy-tck.xml"/>
+        <replace token="test.transitive" value="test" file="${bin.dir}/ivy-tck.xml"/>
         <ivy:retrieve conf="test" pattern="${testlib.dir}/[module](-[classifier]).[ext]" />
-		-->
+        -->
 
         <ivy:resolve file="ivy.xml" conf="default" />
         <ivy:deliver conf="default" deliverpattern="${dist.dir}/ivy.xml" />
