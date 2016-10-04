@@ -146,6 +146,7 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
     public static boolean DEBUG = false;
     public static long SESSION_TTL = 0;
     public static boolean FILL_CELLSET_MEMBERS = true;
+    public static long QUERY_COUNT = 0;
 
     /**
      * Creates an Olap4j connection an XML/A provider.
@@ -983,7 +984,9 @@ public abstract class XmlaOlap4jConnection implements OlapConnection {
         // </SOAP-ENV:Envelope>
         final Element envelope = doc.getDocumentElement();
         if (DEBUG) {
-            System.out.println("** SERVER RESPONSE :");
+            QUERY_COUNT++;
+            System.out.println("** SERVER RESPONSE " + QUERY_COUNT+ ": " );
+            //new Exception().printStackTrace();
             System.out.println(XmlaOlap4jUtil.toString(doc, true));
         }
         assert envelope.getLocalName().equals("Envelope");

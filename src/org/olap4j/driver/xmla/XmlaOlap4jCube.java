@@ -278,6 +278,10 @@ class XmlaOlap4jCube implements Cube, Named
         }
     }
 
+    private static class CachedMember {
+        public XmlaOlap4jMember member;
+    }
+
     /**
      * Implementation of MemberReader that reads from an underlying member
      * reader and caches the results.
@@ -291,15 +295,9 @@ class XmlaOlap4jCube implements Cube, Named
     {
         private final Map<String, XmlaOlap4jMeasure> measuresMap;
 
-        private final Map<String, SoftReference<XmlaOlap4jMember>> memberMap =
-            new HashMap<String, SoftReference<XmlaOlap4jMember>>();
+        private final Map<String, SoftReference<CachedMember>> memberMap = new HashMap<>();
 
-        private final Map<
-            XmlaOlap4jLevel,
-            SoftReference<List<XmlaOlap4jMember>>> levelMemberListMap =
-            new HashMap<
-                XmlaOlap4jLevel,
-                SoftReference<List<XmlaOlap4jMember>>>();
+        private final Map<XmlaOlap4jLevel, SoftReference<List<XmlaOlap4jMember>>> levelMemberListMap = new HashMap<>();
 
         /**
          * Creates a CachingMetadataReader.
@@ -319,32 +317,31 @@ class XmlaOlap4jCube implements Cube, Named
         public XmlaOlap4jMember lookupMemberByUniqueName(
             String memberUniqueName) throws OlapException
         {
+            //System.out.println("[lookupMemberByUniqueName] do lookup for: " + memberUniqueName);
             // First, look in measures map.
-            XmlaOlap4jMeasure measure =
-                measuresMap.get(memberUniqueName);
+            XmlaOlap4jMeasure measure = measuresMap.get(memberUniqueName);
             if (measure != null) {
                 return measure;
             }
 
-            // Next, look in cache.
-            final SoftReference<XmlaOlap4jMember> memberRef =
-                memberMap.get(memberUniqueName);
+            // Next, look in cache.            
+            final SoftReference<CachedMember> memberRef = memberMap.get(memberUniqueName);
+            //System.out.println("[lookupMemberByUniqueName] cache lookup: " + memberRef + " / size="+memberMap.size());
             if (memberRef != null) {
-                final XmlaOlap4jMember member = memberRef.get();
-                if (member != null) {
-                    return member;
+                final CachedMember cachedMember = memberRef.get();
+                if (cachedMember != null) {
+                    return cachedMember.member;
                 }
             }
 
-            final XmlaOlap4jMember member =
-                super.lookupMemberByUniqueName(memberUniqueName);
-            if (member != null
-                && member.getDimension().type != Dimension.Type.MEASURE)
+            final XmlaOlap4jMember member = super.lookupMemberByUniqueName(memberUniqueName);
+            //if (member != null && member.getDimension().type != Dimension.Type.MEASURE)
             {
-                memberMap.put(
-                    memberUniqueName,
-                    new SoftReference<XmlaOlap4jMember>(member));
+                final CachedMember cachedMember = new CachedMember();
+                cachedMember.member = member;
+                memberMap.put(memberUniqueName, new SoftReference<>(cachedMember));
             }
+            //System.out.println("[lookupMemberByUniqueName] raw lookup: " + member);
             return member;
         }
 
@@ -352,8 +349,7 @@ class XmlaOlap4jCube implements Cube, Named
             List<String> memberUniqueNames,
             Map<String, XmlaOlap4jMember> memberMap) throws OlapException
         {
-            final ArrayList<String> remainingMemberUniqueNames =
-                new ArrayList<String>();
+            final ArrayList<String> remainingMemberUniqueNames = new ArrayList<String>();
             for (String memberUniqueName : memberUniqueNames) {
                 // First, look in measures map.
                 XmlaOlap4jMeasure measure =
@@ -364,13 +360,13 @@ class XmlaOlap4jCube implements Cube, Named
                 }
 
                 // Next, look in cache.
-                final SoftReference<XmlaOlap4jMember> memberRef =
-                    this.memberMap.get(memberUniqueName);
-                final XmlaOlap4jMember member;
-                if (memberRef != null
-                    && (member = memberRef.get()) != null)
+                final SoftReference<CachedMember> memberRef = this.memberMap.get(memberUniqueName);                                
+                if (memberRef != null && memberRef.get() != null)
                 {
-                    memberMap.put(memberUniqueName, member);
+                    final CachedMember cachedMember = memberRef.get();
+                    if (cachedMember.member != null) {
+                        memberMap.put(memberUniqueName, cachedMember.member);
+                    }
                     continue;
                 }
 
@@ -380,22 +376,23 @@ class XmlaOlap4jCube implements Cube, Named
             // If any of the member names were not in the cache, look them up
             // by delegating.
             if (!remainingMemberUniqueNames.isEmpty()) {
-                super.lookupMembersByUniqueName(
-                    remainingMemberUniqueNames,
-                    memberMap);
+                super.lookupMembersByUniqueName(remainingMemberUniqueNames,  memberMap);
                 // Add the previously missing members into the cache.
                 for (String memberName : remainingMemberUniqueNames) {
                     XmlaOlap4jMember member = memberMap.get(memberName);
+                    
+                    final CachedMember cachedMember = new CachedMember();
+                    cachedMember.member = member;
+                    this.memberMap.put(memberName, new SoftReference<>(cachedMember));
+
+                    /*
                     if (member != null) {
-                        if (!(member instanceof Measure)
-                            && member.getDimension().type
-                               != Dimension.Type.MEASURE)
+                        if (!(member instanceof Measure) && member.getDimension().type != Dimension.Type.MEASURE)
                         {
-                            this.memberMap.put(
-                                memberName,
-                                new SoftReference<XmlaOlap4jMember>(member));
+                            this.memberMap.put(memberName, new SoftReference<>(Optional.ofNullable(member));
                         }
                     }
+                    */
                 }
             }
         }

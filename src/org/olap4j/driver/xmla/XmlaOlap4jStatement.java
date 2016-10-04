@@ -414,8 +414,14 @@ public abstract class XmlaOlap4jStatement implements OlapStatement {
             cancel();
         }
         // Release the monitor before calling populate, so that cancel can
-        // grab the monitor if it needs to.
+        // grab the monitor if it needs to.        
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[executeOlapQuery] Before cell set populate.");
+        }
         openCellSet.populate();
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[executeOlapQuery] After cell set populate.");
+        }
         return openCellSet;
     }
 

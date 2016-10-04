@@ -155,7 +155,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
         if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
             System.out.println("**********************************************");
             System.out.println("XMLA EXECUTE RESPONSE");
-            System.out.println(XmlaOlap4jUtil.toString(doc, true));
+            //System.out.println(XmlaOlap4jUtil.toString(doc, true));
         }
         assert envelope.getLocalName().equals("Envelope");
         assert envelope.getNamespaceURI().equals(SOAP_NS);
@@ -230,6 +230,9 @@ abstract class XmlaOlap4jCellSet implements CellSet {
         //  </CellInfo>
         final Element axesNode = findChild(root, MDDATASET_NS, "Axes");
 
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[populate] First pass, gather up a list of member unique names to fetch all at once.");
+        }
         // First pass, gather up a list of member unique names to fetch
         // all at once.
         //
@@ -268,33 +271,36 @@ abstract class XmlaOlap4jCellSet implements CellSet {
         // Fetch all members on all axes. Hopefully it can all be done in one
         // round trip, or they are in cache already.
         if (org.olap4j.driver.xmla.XmlaOlap4jConnection.FILL_CELLSET_MEMBERS) {
+            if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+                System.out.println("[populate] Fetch all members on all axes.");
+            }
             metadataReader.lookupMembersByUniqueName(uniqueNames, memberMap);
         }
 
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[populate] Second pass, populate the axis.");
+        }
         // Second pass, populate the axis.
         final Map<Property, Object> propertyValues =
             new HashMap<Property, Object>();
         for (Element axisNode : findChildren(axesNode, MDDATASET_NS, "Axis")) {
             final String axisName = axisNode.getAttribute("name");
+            //System.out.println("[populate] Processing axis: " + axisName);
             final Axis axis = lookupAxis(axisName);
             final ArrayList<Position> positions = new ArrayList<Position>();
-            final XmlaOlap4jCellSetAxis cellSetAxis =
-                new XmlaOlap4jCellSetAxis(
-                    this, axis, Collections.unmodifiableList(positions));
+            final XmlaOlap4jCellSetAxis cellSetAxis = new XmlaOlap4jCellSetAxis(this, axis, Collections.unmodifiableList(positions));
             if (axis.isFilter()) {
                 filterAxis = cellSetAxis;
             } else {
                 axisList.add(cellSetAxis);
             }
-            final Element tuplesNode =
-                findChild(axisNode, MDDATASET_NS, "Tuples");
-            for (Element tupleNode
-                : findChildren(tuplesNode, MDDATASET_NS, "Tuple"))
+            final Element tuplesNode = findChild(axisNode, MDDATASET_NS, "Tuples");
+            for (Element tupleNode : findChildren(tuplesNode, MDDATASET_NS, "Tuple"))
             {
                 final List<Member> members = new ArrayList<Member>();
-                for (Element memberNode
-                    : findChildren(tupleNode, MDDATASET_NS, "Member"))
+                for (Element memberNode : findChildren(tupleNode, MDDATASET_NS, "Member"))
                 {
+                    //System.out.println("[populate] Processing memberNode: " + memberNode);
                     String hierarchyName = memberNode.getAttribute("Hierarchy");
 
                     // XXXXXXXXXXXXXXXXXXXXXXXXXX - HANA
@@ -309,12 +315,17 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                     //System.out.println("HANA UNIQUE_NAME => "+ uname);
 
 
-                    XmlaOlap4jMemberBase member = memberMap.get(uname);
+                    //System.out.println("[populate] XXXXXXXXXX - A - 1  " + memberMap.size());
+
+                    XmlaOlap4jMemberBase member = memberMap.get(uname);                                        
                     if (member == null) {
                         final String caption = stringElement(memberNode, "Caption");
-                        final int lnum = integerElement(memberNode, "LNum");
+                        final int lnum = integerElement(memberNode, "LNum");                        
                         final Hierarchy hierarchy = lookupHierarchy(metaData.cube, hierarchyName);
+                        //System.out.println("[populate] XXXXXXXXXX - A - 1-2");
                         final Level level = hierarchy.getLevels().get(lnum);
+                        //System.out.println("[populate] XXXXXXXXXX - A - 1-3");
+                        //System.out.println("[populate] XXXXXXXXXX - A - 2");
 
                         String parentUN = stringElement(memberNode, "PARENT_UNIQUE_NAME");
                         
@@ -325,9 +336,10 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                         }
                         // XXXXXXXXXXXXXXXXXXXXXXXXXX - /HANA
 
-                        member = new XmlaOlap4jSurpriseMember(
-                            this, level, hierarchy, lnum, caption, uname, parentUN);
+                        //System.out.println("[populate] XXXXXXXXXX - A - 3");
+                        member = new XmlaOlap4jSurpriseMember(this, level, hierarchy, lnum, caption, uname, parentUN);                        
                     }
+                    //System.out.println("[populate] Member found: " + member);
                     propertyValues.clear();
 
 
@@ -353,6 +365,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                         //System.out.println(uname + " ==> local name = " + childNode.getLocalName() + " ==> " + childNode.getTextContent());
                         XmlaOlap4jCellSetMemberProperty property =
                             ((XmlaOlap4jCellSetAxisMetaData)cellSetAxis.getAxisMetaData()).lookupProperty(hierarchyName, childNode.getLocalName());
+
                         if (property != null) {
                             String value = childNode.getTextContent();
                             propertyValues.put(property, value);
@@ -365,6 +378,8 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                     }
                     members.add(member);
                 }
+
+                //System.out.println("[populate] Add members to position: " + members);
                 positions.add(new XmlaOlap4jPosition(members, positions.size()));
             }
         }
@@ -385,6 +400,9 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                             0)));
         }
 
+        if (org.olap4j.driver.xmla.XmlaOlap4jConnection.DEBUG) {
+            System.out.println("[populate] Third pass, populate the data cells.");
+        }
         final Element cellDataNode = findChild(root, MDDATASET_NS, "CellData");
         for (Element cell : findChildren(cellDataNode, MDDATASET_NS, "Cell")) {
             propertyValues.clear();
@@ -1524,9 +1542,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
             }
             if (parentMember == null) {
                 try {
-                    parentMember =
-                        getCube().getMetadataReader()
-                            .lookupMemberByUniqueName(parentMemberUniqueName);
+                    parentMember = getCube().getMetadataReader().lookupMemberByUniqueName(parentMemberUniqueName);
                     if (parentMember == null
                             && getLevel().getDepth() == 1
                             && getHierarchy().hasAll())
@@ -1536,8 +1552,7 @@ abstract class XmlaOlap4jCellSet implements CellSet {
                         parentMember = getAllMember();
                     }
                 } catch (OlapException e) {
-                    throw new RuntimeException(
-                        "Failed to retrieve parent of " + getName(), e);
+                    throw new RuntimeException("Failed to retrieve parent of " + getName(), e);
                 }
             }
             return parentMember;
